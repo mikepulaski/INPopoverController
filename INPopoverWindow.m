@@ -96,13 +96,14 @@
 {
 	if ([self isVisible])
 		return;
+
+	[[self frameView] setAnimating:YES];
 	
 	NSRect endFrame = [self frame];
 	NSRect startFrame = [popoverController popoverFrameWithSize:START_SIZE andArrowDirection:self.frameView.arrowDirection];
 	NSRect overshootFrame = [popoverController popoverFrameWithSize:NSMakeSize(endFrame.size.width*OVERSHOOT_FACTOR, endFrame.size.height*OVERSHOOT_FACTOR) andArrowDirection:self.frameView.arrowDirection];
 	
 	_zoomWindow = [[self _zoomWindowWithRect:startFrame] retain];
-	
 	[_zoomWindow setAlphaValue:0.0];
 	[_zoomWindow orderFront:self];
 	
@@ -124,6 +125,8 @@
 
 - (void)animationDidStop:(CAAnimation *)anim finished:(BOOL)flag
 {
+	[[self frameView] setAnimating:NO];
+	
 	[self makeKeyAndOrderFront:self];	
 	[_zoomWindow close];
 	
@@ -133,6 +136,7 @@
 	// call the animation delegate of the "real" window
 	CAAnimation *windowAnimation = [self animationForKey:@"alphaValue"];
 	[[windowAnimation delegate] animationDidStop:anim finished:flag];
+	
 }
 
 #pragma mark -

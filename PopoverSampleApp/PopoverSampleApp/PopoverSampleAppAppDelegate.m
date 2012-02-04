@@ -24,7 +24,7 @@
     if (self.popoverController.popoverIsVisible) {
         [self.popoverController closePopover:nil];
     } else {
-        [self.popoverController presentPopoverFromRect:[sender bounds] inView:sender preferredArrowDirection:INPopoverArrowDirectionLeft anchorsToPositionView:YES];
+        [self.popoverController presentPopoverFromRect:[sender bounds] inView:sender preferredArrowDirection:INPopoverArrowDirectionUp anchorsToPositionView:YES];
     }
 }
 

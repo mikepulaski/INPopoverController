@@ -28,6 +28,7 @@
 @synthesize closesWhenPopoverResignsKey = _closesWhenPopoverResignsKey;
 @synthesize closesWhenApplicationBecomesInactive = _closesWhenApplicationBecomesInactive;
 @synthesize animates = _animates;
+@synthesize useGlassBackground = _useGlassBackground;
 
 #pragma mark -
 #pragma mark Initialization
@@ -66,11 +67,15 @@
 	_viewRect = rect;
 	_screenRect = [positionView convertRect:rect toView:nil]; // Convert the rect to window coordinates
 	_screenRect.origin = [mainWindow convertBaseToScreen:_screenRect.origin]; // Convert window coordinates to screen coordinates
+	_displayRect = [[[positionView window] screen] frame];
+	
 	INPopoverArrowDirection calculatedDirection = [self _arrowDirectionWithPreferredArrowDirection:direction]; // Calculate the best arrow direction
 	[self _setArrowDirection:calculatedDirection]; // Change the arrow direction of the popover
 	NSRect windowFrame = [self popoverFrameWithSize:self.contentSize andArrowDirection:calculatedDirection]; // Calculate the window frame based on the arrow direction
-	[_popoverWindow setFrame:windowFrame display:YES]; // Se the frame of the window
+	[_popoverWindow setFrame:windowFrame display:YES]; // Set the frame of the window
 	[[_popoverWindow animationForKey:@"alphaValue"] setDelegate:self];
+	
+	[[_popoverWindow frameView] setArrowOffset:_arrowOffset];
 	
 	// Show the popover
 	[self _callDelegateMethod:@selector(popoverWillShow:)]; // Call the delegate
@@ -159,6 +164,23 @@
 		// If no arrow direction is specified, just return an empty rect
 		windowFrame = NSZeroRect;
 	}
+		
+	if (NSMaxX(windowFrame) > NSMaxX(_displayRect) ) {
+		CGFloat xOrigin = NSMaxX(_displayRect) - NSWidth(windowFrame);
+		
+		_arrowOffset = NSMinX(windowFrame) - xOrigin;
+		windowFrame.origin.x = xOrigin;
+	}
+	else if (NSMinX(windowFrame) < NSMinX(_displayRect)) {
+		CGFloat xOrigin = NSMinX(_displayRect);
+		
+		_arrowOffset = NSMinX(windowFrame) - xOrigin;
+		windowFrame.origin.x = xOrigin;
+	}
+	else {
+		_arrowOffset = 0;
+	}
+	
 	return windowFrame;
 }
 
@@ -218,6 +240,8 @@
 
 - (BOOL)popoverIsVisible { return [_popoverWindow isVisible]; }
 
+- (BOOL)useGlassBackground { return _popoverWindow.frameView.useGlassBackground; }
+
 #pragma mark -
 #pragma mark Setters
 
@@ -240,6 +264,8 @@
 		[_popoverWindow setContentView:contentView];
 	}
 }
+
+- (void)setUseGlassBackground:(BOOL)flag { _popoverWindow.frameView.useGlassBackground = flag; }
 
 - (void)setContentSize:(NSSize)newContentSize
 {
@@ -273,7 +299,7 @@
 	_popoverWindow = [[INPopoverWindow alloc] initWithContentRect:NSZeroRect styleMask:NSBorderlessWindowMask backing:NSBackingStoreBuffered defer:NO];
 	
 	// set defaults like iCal popover
-	self.color = [NSColor colorWithCalibratedWhite:0.94 alpha:0.92];
+	self.color = [NSColor colorWithCalibratedWhite:0.96 alpha:0.84];
 	self.borderColor = [NSColor colorWithCalibratedWhite:1.0 alpha:0.92];
 	self.borderWidth = 1.0;
 	self.closesWhenPopoverResignsKey = YES;
@@ -358,6 +384,7 @@
 	NSRect calculatedFrame = [self popoverFrameWithSize:self.contentSize andArrowDirection:self.arrowDirection]; // Calculate the window frame based on the arrow direction
 	newFrame.origin = calculatedFrame.origin;
 	[_popoverWindow setFrame:newFrame display:YES animate:NO]; // Set the frame of the window
+	
 }
 
 - (void)_closePopoverAndResetVariables

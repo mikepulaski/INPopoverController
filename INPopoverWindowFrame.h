@@ -18,8 +18,16 @@
 	NSColor *_topHighlightColor;
 	CGFloat _borderWidth;
 	INPopoverArrowDirection _arrowDirection;
+	CGFloat _arrowOffset;
+	
+	BOOL _animating;
+	BOOL _glassBackground;
 }
 @property (nonatomic, retain) NSColor *color, *borderColor, *topHighlightColor;
 @property (nonatomic, assign) CGFloat borderWidth;
 @property (nonatomic, assign) INPopoverArrowDirection arrowDirection;
+@property (nonatomic, assign) CGFloat arrowOffset;
+@property (nonatomic, assign, getter=isAnimating) BOOL animating;
+@property (nonatomic, assign) BOOL useGlassBackground;
+
 @end

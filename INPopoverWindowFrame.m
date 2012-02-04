@@ -6,6 +6,8 @@
 //  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #import "INPopoverWindowFrame.h"
+#import <CoreServices/CoreServices.h>
+#import <QuartzCore/QuartzCore.h>
 
 @interface INPopoverWindowFrame ()
 - (NSBezierPath*)_popoverBezierPathWithRect:(NSRect)aRect;
@@ -15,6 +17,9 @@
 @synthesize color = _color, borderColor = _borderColor, topHighlightColor=_topHighlightColor;
 @synthesize borderWidth = _borderWidth;
 @synthesize arrowDirection = _arrowDirection;
+@synthesize arrowOffset = _arrowOffset;
+@synthesize animating = _animating;
+@synthesize useGlassBackground = _useGlassBackground;
 
 - (id)initWithFrame:(NSRect)frame
 {
@@ -35,14 +40,67 @@
 	[super dealloc];
 }
 
+- (void)setFrame:(NSRect)frameRect
+{
+	[super setFrame:frameRect];
+}
+
+// Based off of discusion: http://www.cocoadev.com/index.pl?ScreenShotCode
+- (CIImage *)blurredScreenImageWithBlurRadius:(CGFloat)blurRadius
+{
+    // Get the CGWindowID of supplied window
+    CGWindowID windowID = (CGWindowID) [[self window] windowNumber];
+    
+    // Get window's rect in flipped screen coordinates
+    CGRect windowRect = NSRectToCGRect([[self window] frame]);
+    windowRect.origin.y = NSMaxY([[[self window] screen] frame]) - NSMaxY([[self window] frame]);
+    
+    // Get a composite image of all the windows beneath your window
+    CGImageRef capturedImage = CGWindowListCreateImage( windowRect, kCGWindowListOptionOnScreenBelowWindow, windowID, kCGWindowImageDefault );
+    
+    if(CGImageGetWidth(capturedImage) <= 1) {
+        CGImageRelease(capturedImage);
+        return nil;
+    }
+    
+	CIImage *sourceImage = [CIImage imageWithCGImage:capturedImage];
+    CGImageRelease(capturedImage);
+	
+	if (blurRadius == 0) {
+		return sourceImage;
+	}
+	
+	CIFilter *gaussianBlur = [CIFilter filterWithName:@"CIGaussianBlur"]; 
+	[gaussianBlur setValue:sourceImage forKey:@"inputImage"];
+	[gaussianBlur setValue:[NSNumber numberWithFloat:blurRadius] forKey:@"inputRadius"];
+	
+	return [gaussianBlur valueForKey:@"outputImage"];
+}
+
 - (void)drawRect:(NSRect)dirtyRect
 {
 	NSBezierPath *path = [self _popoverBezierPathWithRect:[self bounds]];
-	[self.color set];
-	[path fill];
+	// Bezier paths draw *on* the path. This transformation its offset and does a proper, crisp drawing
+	// by not using internally using fractional pixels and subsequent anti-aliasing.
 	
+	NSAffineTransform *transform = [NSAffineTransform transform];
+	[transform translateXBy:_borderWidth/2 yBy:_borderWidth/2];
+	[path transformUsingAffineTransform:transform];
+	
+	[self.color set];
+
+	if (self.useGlassBackground && ![self isAnimating] && self.color.alphaComponent != 1) {
+		[path setClip];
+		
+		CIImage *backgroundImage = [self blurredScreenImageWithBlurRadius:1.2];
+		[backgroundImage drawInRect:[self bounds] fromRect:[self bounds] operation:NSCompositeSourceOver fraction:1.0];
+	}		
+
+	[path fill];	
+
 	[path setLineWidth:self.borderWidth];
 	[self.borderColor set];
+	
 	[path stroke];
 	
 	if (self.topHighlightColor) {
@@ -66,7 +124,7 @@
 - (NSBezierPath*)_popoverBezierPathWithRect:(NSRect)aRect
 {
 	CGFloat radius = INPOPOVER_CORNER_RADIUS;
-	CGFloat inset = radius + INPOPOVER_ARROW_HEIGHT;
+	CGFloat inset = radius + INPOPOVER_ARROW_HEIGHT + _borderWidth;
 	NSRect drawingRect = NSInsetRect(aRect, inset, inset);
 	CGFloat minX = NSMinX(drawingRect);
 	CGFloat maxX = NSMaxX(drawingRect);
@@ -79,7 +137,10 @@
 	// Bottom left corner
 	[path appendBezierPathWithArcWithCenter:NSMakePoint(minX, minY) radius:radius startAngle:180.0 endAngle:270.0];
 	if (self.arrowDirection == INPopoverArrowDirectionDown) {
-		CGFloat midX = NSMidX(drawingRect);
+		CGFloat midX = NSMidX(drawingRect) + _arrowOffset;
+		midX = MIN(midX, maxX - inset);
+		midX = MAX(inset + radius + floor(INPOPOVER_ARROW_WIDTH/2.0), midX);
+
 		NSPoint points[3];
 		points[0] = NSMakePoint(floor(midX - (INPOPOVER_ARROW_WIDTH / 2.0)), minY - radius); // Starting point
 		points[1] = NSMakePoint(floor(midX), points[0].y - INPOPOVER_ARROW_HEIGHT); // Arrow tip
@@ -99,7 +160,10 @@
 	// Top right corner
 	[path appendBezierPathWithArcWithCenter:NSMakePoint(maxX, maxY) radius:radius startAngle:0.0 endAngle:90.0];
 	if (self.arrowDirection == INPopoverArrowDirectionUp) {
-		CGFloat midX = NSMidX(drawingRect);
+		CGFloat midX = NSMidX(drawingRect) + _arrowOffset;
+		midX = MIN(midX, maxX - inset);
+		midX = MAX(inset + radius + floor(INPOPOVER_ARROW_WIDTH/2.0), midX);
+		
 		NSPoint points[3];
 		points[0] = NSMakePoint(floor(midX + (INPOPOVER_ARROW_WIDTH / 2.0)), maxY + radius);
 		points[1] = NSMakePoint(floor(midX), points[0].y + INPOPOVER_ARROW_HEIGHT);

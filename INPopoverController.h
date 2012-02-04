@@ -22,6 +22,11 @@
 	NSView *_positionView;
 	NSRect _screenRect;
 	NSRect _viewRect;
+	
+	NSRect _displayRect;
+	CGFloat _arrowOffset;
+	
+	BOOL _useGlassBackground;
 }
 
 #pragma mark -
@@ -41,6 +46,9 @@
 
 /** The width of the popover border, drawn using borderColor. Default value: 0.0 (no border). Changes to this value are not animated. **/
 @property (nonatomic) CGFloat borderWidth;
+
+/** Popovers can be drawn with a glass background (ie: blurry contents behind the alpha value). Does not redraw itself when the background changes. **/
+@property (nonatomic) BOOL useGlassBackground;
 
 /** The current arrow direction of the popover. If the popover has never been displayed, then this will return INPopoverArrowDirectionUndefined */
 @property (readonly) INPopoverArrowDirection arrowDirection;
